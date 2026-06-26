@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  headerImageUrl String   @map("header_image_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sections Section[]
+
+  @@map("projects")
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  title     String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  media   Media[]
+
+  @@map("project_sections")
+}
+
+model Media {
+  id              String   @id @default(uuid())
+  sectionId       String   @map("section_id")
+  mediaType       String   @default("image") @map("media_type")
+  mediaUrl        String   @map("media_url")
+  isClickable     Boolean  @default(false) @map("is_clickable")
+  targetMediaUrl  String?  @map("target_media_url")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@map("section_media")
+}

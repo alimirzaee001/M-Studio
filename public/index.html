@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M Studio — Office for Architecture</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-identity">
+          <h1 class="brand-title">
+            <img
+              src="/assets/logo-wordmark.svg"
+              alt="M Studio — Seyed Morteza Mobini"
+              class="brand-logo"
+              width="320"
+              height="43"
+              draggable="false"
+            />
+          </h1>
+        </div>
+      </div>
+
+      <nav class="box-stack" aria-label="Primary">
+        <a href="#" class="nav-box nav-box--logo" aria-label="M Studio">
+          <img src="/assets/logo-stamp.svg" alt="M Studio" draggable="false" />
+        </a>
+        <a href="#" class="nav-box nav-box--logo" aria-label="M Group">
+          <img src="/assets/logo-mark.svg" alt="M Group" draggable="false" />
+        </a>
+        <div class="magnifier-slot">
+          <button
+            type="button"
+            class="nav-box nav-box--magnifier"
+            id="magnifier-toggle"
+            aria-label="Magnifying glass"
+            aria-pressed="false"
+          >
+            <img
+              src="/assets/magnifier-icon.svg"
+              alt=""
+              class="magnifier-icon"
+              draggable="false"
+            />
+            <span class="magnifier-hint">جهت غیر فعال کردن کلید Esc روی کیبورد را فشار دهید</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          class="nav-box nav-box--menu"
+          id="menu-toggle"
+          aria-label="Project list"
+          aria-expanded="false"
+          aria-controls="project-dropdown"
+        >
+          <span class="menu-icon"><span></span><span></span><span></span></span>
+        </button>
+
+        <div class="project-dropdown" id="project-dropdown" role="menu" aria-hidden="true" hidden>
+          <span class="project-dropdown-title">PROJECTS</span>
+          <ul class="project-list" id="project-list"></ul>
+        </div>
+      </nav>
+    </header>
+
+    <div class="gallery-chrome">
+      <a href="#" class="m-group-link">
+        <span class="m-group-char">M</span><span class="m-group-rest"> GROUP</span>
+      </a>
+      <div class="lang-switch">
+        <button type="button" class="lang-btn active" data-lang="en">EN</button>
+        <span class="lang-sep">/</span>
+        <button type="button" class="lang-btn" data-lang="fa">FA</button>
+      </div>
+    </div>
+
+    <div class="projects-viewport" id="projects-viewport">
+      <div class="projects-track" id="projects-track"></div>
+    </div>
+
+    <div class="project-detail" id="project-detail" aria-hidden="true" hidden>
+      <div class="section-viewport" id="section-viewport">
+        <div class="section-loader" id="section-loader" aria-hidden="true" aria-live="polite">
+          <div class="section-loader-spinner" role="status" aria-label="Loading section images"></div>
+        </div>
+        <div class="section-track" id="section-track"></div>
+      </div>
+      <aside class="project-sidebar">
+        <div class="project-sidebar-meta">
+          <h2 class="project-sidebar-title" id="project-detail-title"></h2>
+          <p class="project-sidebar-desc" id="project-detail-desc"></p>
+        </div>
+        <nav class="project-section-nav" id="project-section-nav" aria-label="Project sections"></nav>
+      </aside>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox" hidden aria-hidden="true">
+    <div class="lightbox-stage">
+      <img class="lightbox-img" id="lightbox-img" alt="" draggable="false" />
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="nav-box nav-box--close lightbox-close"
+    id="lightbox-close"
+    hidden
+    aria-label="Close image"
+  >
+    <span class="lightbox-close-icon" aria-hidden="true"></span>
+  </button>
+
+  <div id="magnifier-root" class="magnifier-root" hidden aria-hidden="true">
+    <div class="magnifier-lens" id="magnifier-lens">
+      <div class="magnifier-lens-inner" id="magnifier-lens-inner"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

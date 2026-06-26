@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M-Studio Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin.css" />
+</head>
+<body>
+  <div class="top-progress" id="top-progress" aria-hidden="true">
+    <div class="top-progress-bar"></div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>M-Studio</h1>
+        <p>Portfolio Admin</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="btn-new-project">
+        + New Project
+      </button>
+      <nav class="project-list" id="project-list"></nav>
+    </aside>
+
+    <main class="main" id="main-content">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">◇</div>
+        <h2>Select a project</h2>
+        <p>Choose a project from the sidebar or create a new one to get started.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <dialog class="modal" id="confirm-modal">
+    <form method="dialog" class="modal-content">
+      <h3 id="confirm-title">Confirm</h3>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script type="module" src="/admin/js/app.js"></script>
+</body>
+</html>

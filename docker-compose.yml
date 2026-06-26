@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: file:/app/data/app.db
+      PORT: 3000
+      NODE_ENV: production
+    volumes:
+      - m-studio-data:/app/data
+      - m-studio-uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  m-studio-data:
+  m-studio-uploads:
