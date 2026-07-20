@@ -34,7 +34,7 @@ function createSmoothScroller(viewport, track) {
       return;
     }
 
-    viewport.scrollLeft = current + diff * 0.14;
+    viewport.scrollLeft = current + diff * 0.11;
     rafId = requestAnimationFrame(tick);
   }
 
@@ -66,8 +66,8 @@ function createSmoothScroller(viewport, track) {
   }
 
   function applyMomentum(velocity) {
-    if (Math.abs(velocity) < 0.5) return;
-    scrollTo(targetScroll - velocity * 12);
+    if (Math.abs(velocity) < 0.35) return;
+    scrollTo(targetScroll - velocity * 20);
   }
 
   return { scrollTo, scrollBy, syncTarget, cancel, applyMomentum };
@@ -114,6 +114,12 @@ function initHorizontalScroll(viewport, track, scroller, options = {}) {
     (e) => {
       if (!isWheelActive()) return;
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const paragraphBody = e.target instanceof Element
+        ? e.target.closest('.detail-paragraph-body')
+        : null;
+      if (paragraphBody && paragraphBody.scrollHeight > paragraphBody.clientHeight) {
+        return;
+      }
       e.preventDefault();
       scroller.scrollBy(e.deltaY);
     },
@@ -297,6 +303,8 @@ let currentProject = null;
 let activeSectionId = null;
 let activeProjectId = null;
 let magnifier = null;
+let galleryResizeHandler = null;
+let galleryHashHandled = false;
 const lightbox = initLightbox();
 
 function refreshMagnifierMirror() {
@@ -324,33 +332,64 @@ function renderActiveSectionTrack(project, section) {
     return panels.join('');
   }
 
-  const images = sortMediaByOrder(section.media.filter((m) => m.media_type === 'image'));
-  const videos = sortMediaByOrder(section.media.filter((m) => m.media_type === 'video_link'));
+  const media = sortMediaByOrder(section.media);
 
-  for (const m of images) {
-    panels.push(`
-      <div class="detail-panel detail-panel--image">
-        <figure
-          class="detail-image-item${m.is_clickable ? ' is-clickable' : ''}"
-          ${m.is_clickable ? `data-target="${escapeHtml(resolveUrl(m.target_media_url))}"` : ''}
+  for (const m of media) {
+    if (m.media_type === 'image') {
+      panels.push(`
+        <div class="detail-panel detail-panel--image">
+          <figure
+            class="detail-image-item${m.is_clickable ? ' is-clickable' : ''}"
+            ${m.is_clickable ? `data-target="${escapeHtml(resolveUrl(m.target_media_url))}"` : ''}
+          >
+            <img src="${resolveUrl(m.media_url)}" alt="" loading="lazy" draggable="false" />
+          </figure>
+        </div>
+      `);
+    } else if (m.media_type === 'video_link') {
+      panels.push(`
+        <div class="detail-panel detail-panel--video">
+          <a class="detail-video-link" href="${escapeHtml(m.media_url)}" target="_blank" rel="noopener noreferrer">
+            Watch video
+          </a>
+        </div>
+      `);
+    } else if (m.media_type === 'black_rectangle') {
+      const width = Number.isFinite(m.size) ? m.size : 80;
+      panels.push(`
+        <div
+          class="detail-panel detail-panel--strip detail-panel--black-rectangle is-clickable"
+          style="width:${width}px"
+          data-target="${escapeHtml(resolveUrl(m.media_url))}"
         >
-          <img src="${resolveUrl(m.media_url)}" alt="" loading="lazy" draggable="false" />
-        </figure>
-      </div>
-    `);
+          <span class="detail-strip-label">${escapeHtml(m.title || '')}</span>
+        </div>
+      `);
+    } else if (m.media_type === 'white_rectangle') {
+      const width = Number.isFinite(m.size) ? m.size : 80;
+      panels.push(`
+        <div
+          class="detail-panel detail-panel--strip detail-panel--white-rectangle"
+          style="width:${width}px"
+        >
+          <span class="detail-strip-label">${escapeHtml(m.title || '')}</span>
+        </div>
+      `);
+    } else if (m.media_type === 'paragraph') {
+      const width = Number.isFinite(m.size) ? m.size : 280;
+      const color = m.color === 'white' ? 'white' : 'black';
+      panels.push(`
+        <div
+          class="detail-panel detail-panel--paragraph detail-panel--paragraph-${color}"
+          style="width:${width}px"
+        >
+          <div class="detail-paragraph-body">${escapeHtml(m.body || '').replace(/\n/g, '<br>')}</div>
+        </div>
+      `);
+    }
   }
 
-  for (const video of videos) {
-    panels.push(`
-      <div class="detail-panel detail-panel--video">
-        <a class="detail-video-link" href="${escapeHtml(video.media_url)}" target="_blank" rel="noopener noreferrer">
-          Watch video
-        </a>
-      </div>
-    `);
-  }
-
-  if (images.length === 0 && videos.length === 0) {
+  if (media.length === 0) {
     panels.push(`
       <div class="detail-panel detail-panel--empty">
         <p class="detail-empty-text">No media in this section.</p>
@@ -440,10 +479,16 @@ function initDetailScroll() {
   detailScroller = createSmoothScroller(viewport, track);
   initHorizontalScroll(viewport, track, detailScroller, {
     isWheelActive: () => document.getElementById('project-detail').classList.contains('is-open'),
-    dragSelector: '.detail-panel--image, .detail-panel--video, .detail-panel--empty',
+    dragSelector: '.detail-panel--image, .detail-panel--video, .detail-panel--empty, .detail-panel--strip, .detail-panel--paragraph',
     onTap: (panel) => {
       const item = panel.querySelector('.detail-image-item.is-clickable');
-      if (item?.dataset.target) lightbox.open(item.dataset.target);
+      if (item?.dataset.target) {
+        lightbox.open(item.dataset.target);
+        return;
+      }
+      if (panel.classList.contains('detail-panel--black-rectangle') && panel.dataset.target) {
+        lightbox.open(panel.dataset.target);
+      }
     },
   });
 
@@ -470,6 +515,13 @@ async function openProjectDetail(projectId) {
       return r.json();
     });
 
+    if (project.locale && project.locale !== currentLang) {
+      if (history.state?.projectId || window.location.hash.startsWith('#project/')) {
+        history.replaceState(null, '', window.location.pathname);
+      }
+      return;
+    }
+
     currentProject = project;
     activeProjectId = projectId;
     document.getElementById('project-detail-title').textContent = project.title;
@@ -485,6 +537,7 @@ async function openProjectDetail(projectId) {
     track.innerHTML = '';
     setSectionLoading(true);
     requestAnimationFrame(() => detail.classList.add('is-open'));
+    magnifier?.setAvailable(true);
 
     await showSection(firstSectionId);
 
@@ -498,6 +551,7 @@ function closeProjectDetail() {
   const detail = document.getElementById('project-detail');
   if (!detail.classList.contains('is-open')) return;
 
+  magnifier?.setAvailable(false);
   detail.classList.remove('is-open');
   detail.setAttribute('aria-hidden', 'true');
   setSectionLoading(false);
@@ -523,7 +577,7 @@ function closeProjectDetail() {
 initSectionNav();
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !lightbox.isOpen()) closeProjectDetail();
+  if (e.key === 'Escape' && !lightbox.isOpen() && !pageModal.isOpen()) closeProjectDetail();
 });
 
 document.querySelector('.brand-title')?.addEventListener('click', () => {
@@ -538,28 +592,199 @@ window.addEventListener('popstate', (e) => {
   }
 });
 
-/* ---------- Gallery ---------- */
+/* ---------- i18n (menu + page modal titles) ---------- */
 
-function initProjectListMenu(projects, viewport, scroller, onOpenProject) {
-  const toggle = document.getElementById('menu-toggle');
-  const dropdown = document.getElementById('project-dropdown');
-  const list = document.getElementById('project-list');
+const I18N = {
+  en: {
+    home: 'Home',
+    about: 'About Us',
+    contact: 'Contact Us',
+    menu: 'Menu',
+    emptyAbout: 'About content coming soon.',
+    emptyContact: 'Contact content coming soon.',
+    emptyProjects: 'No projects yet.',
+    loadError: 'Unable to load projects.',
+  },
+  fa: {
+    home: 'صفحه اصلی',
+    about: 'درباره ما',
+    contact: 'تماس با ما',
+    menu: 'منو',
+    emptyAbout: 'محتوای درباره ما به‌زودی اضافه می‌شود.',
+    emptyContact: 'محتوای تماس با ما به‌زودی اضافه می‌شود.',
+    emptyProjects: 'هنوز پروژه‌ای اضافه نشده است.',
+    loadError: 'بارگذاری پروژه‌ها ممکن نشد.',
+  },
+};
 
-  if (projects.length === 0) {
-    list.innerHTML = '<li class="project-list-empty">No projects yet.</li>';
-  } else {
-    list.innerHTML = projects
-      .map(
-        (project) => `
-      <li>
-        <button type="button" class="project-list-item" data-id="${project.id}" role="menuitem">
-          ${escapeHtml(project.title)}
-        </button>
-      </li>
-    `,
-      )
-      .join('');
+const LOCALE_STORAGE_KEY = 'm-studio-locale';
+
+function readStoredLocale() {
+  try {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored === 'fa' || stored === 'en') return stored;
+  } catch {
+    /* ignore */
   }
+  return 'fa';
+}
+
+let currentLang = readStoredLocale();
+
+function t(key) {
+  return I18N[currentLang]?.[key] ?? I18N.en[key] ?? key;
+}
+
+function applyLanguage(lang, { reloadContent = false } = {}) {
+  currentLang = I18N[lang] ? lang : 'fa';
+  // Set lang for CSS content styling; do NOT set dir on <html> — chrome layout stays fixed.
+  document.documentElement.lang = currentLang;
+
+  try {
+    localStorage.setItem(LOCALE_STORAGE_KEY, currentLang);
+  } catch {
+    /* ignore */
+  }
+
+  document.querySelectorAll('.lang-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+  });
+
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const key = el.getAttribute('data-i18n');
+    if (key && I18N.en[key] !== undefined) el.textContent = t(key);
+  });
+
+  const menuToggle = document.getElementById('menu-toggle');
+  if (menuToggle) menuToggle.setAttribute('aria-label', t('menu'));
+
+  if (pageModal.isOpen() && pageModal.currentPage) {
+    pageModal.refreshTitle();
+    openCmsPage(pageModal.currentPage);
+  }
+
+  if (reloadContent) {
+    if (activeProjectId) closeProjectDetail();
+    loadProjects();
+  }
+}
+
+function initLanguageSwitch() {
+  document.querySelector('.lang-switch')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.lang-btn');
+    if (!btn || btn.dataset.lang === currentLang) return;
+    applyLanguage(btn.dataset.lang, { reloadContent: true });
+  });
+  applyLanguage(currentLang);
+}
+
+/* ---------- CMS page modal (About / Contact) ---------- */
+/* Admin-authored HTML is trusted CMS content and rendered via innerHTML. */
+
+async function fetchSiteSettings() {
+  const res = await fetch(`/api/site-settings?locale=${encodeURIComponent(currentLang)}`);
+  if (!res.ok) throw new Error('Failed to load site settings');
+  return res.json();
+}
+
+const pageModal = (() => {
+  const root = document.getElementById('page-modal');
+  const backdrop = document.getElementById('page-modal-backdrop');
+  const titleEl = document.getElementById('page-modal-title');
+  const bodyEl = document.getElementById('page-modal-body');
+  const closeBtn = document.getElementById('page-modal-close');
+  let currentPage = null;
+
+  function isOpen() {
+    return root.classList.contains('is-open');
+  }
+
+  function refreshTitle() {
+    if (!currentPage) return;
+    titleEl.textContent = currentPage === 'about' ? t('about') : t('contact');
+  }
+
+  function open(page, html) {
+    currentPage = page;
+    refreshTitle();
+
+    const trimmed = (html || '').trim();
+    if (trimmed) {
+      bodyEl.classList.remove('page-modal-body--empty');
+      // Trusted admin CMS HTML — intentional innerHTML for About/Contact pages.
+      bodyEl.innerHTML = trimmed;
+    } else {
+      bodyEl.classList.add('page-modal-body--empty');
+      bodyEl.textContent = page === 'about' ? t('emptyAbout') : t('emptyContact');
+    }
+
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(() => root.classList.add('is-open'));
+    closeBtn.focus();
+  }
+
+  function close() {
+    if (!isOpen()) return;
+    root.classList.remove('is-open');
+    root.setAttribute('aria-hidden', 'true');
+    currentPage = null;
+
+    root.addEventListener(
+      'transitionend',
+      function onClose(e) {
+        if (e.propertyName !== 'opacity' || isOpen()) return;
+        root.hidden = true;
+        bodyEl.innerHTML = '';
+        root.removeEventListener('transitionend', onClose);
+      },
+      { once: true },
+    );
+  }
+
+  closeBtn.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen()) {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  });
+
+  return {
+    open,
+    close,
+    isOpen,
+    get currentPage() {
+      return currentPage;
+    },
+    refreshTitle,
+  };
+})();
+
+async function openCmsPage(page) {
+  try {
+    const settings = await fetchSiteSettings();
+    const html = page === 'about' ? settings.about_html : settings.contact_html;
+    pageModal.open(page, html);
+  } catch {
+    pageModal.open(page, '');
+  }
+}
+
+function goHome() {
+  pageModal.close();
+  if (activeProjectId) closeProjectDetail();
+}
+
+/* ---------- Site menu (hamburger) ---------- */
+
+function initSiteMenu() {
+  const toggle = document.getElementById('menu-toggle');
+  const dropdown = document.getElementById('site-menu');
+  const list = document.getElementById('site-menu-list');
 
   function isOpen() {
     return dropdown.classList.contains('open');
@@ -596,22 +821,18 @@ function initProjectListMenu(projects, viewport, scroller, onOpenProject) {
   });
 
   list.addEventListener('click', (e) => {
-    const item = e.target.closest('.project-list-item');
+    const item = e.target.closest('.site-menu-item');
     if (!item) return;
-
-    if (onOpenProject) {
-      onOpenProject(item.dataset.id);
-    } else if (scroller) {
-      const track = document.getElementById('projects-track');
-      const card = track.querySelector(`.project-card[data-id="${item.dataset.id}"]`);
-      if (card) {
-        const target = card.offsetLeft - (viewport.clientWidth - card.offsetWidth) / 2;
-        scroller.scrollTo(target);
-      }
-    }
     hide();
+
+    const action = item.dataset.action;
+    if (action === 'home') goHome();
+    else if (action === 'about') openCmsPage('about');
+    else if (action === 'contact') openCmsPage('contact');
   });
 }
+
+/* ---------- Gallery ---------- */
 
 async function loadProjects() {
   const track = document.getElementById('projects-track');
@@ -619,7 +840,7 @@ async function loadProjects() {
 
   try {
     const projects = (
-      await fetch('/api/projects').then((r) => {
+      await fetch(`/api/projects?locale=${encodeURIComponent(currentLang)}`).then((r) => {
         if (!r.ok) throw new Error('Failed to load projects');
         return r.json();
       })
@@ -628,8 +849,7 @@ async function loadProjects() {
       .reverse();
 
     if (projects.length === 0) {
-      track.innerHTML = '<p class="projects-empty">No projects yet.</p>';
-      initProjectListMenu(projects, viewport, null, openProjectDetail);
+      track.innerHTML = `<p class="projects-empty">${escapeHtml(t('emptyProjects'))}</p>`;
       return;
     }
 
@@ -648,6 +868,9 @@ async function loadProjects() {
           loading="${index < 4 ? 'eager' : 'lazy'}"
           draggable="false"
         />
+        <span class="project-card-overlay" aria-hidden="true">
+          <span class="project-card-title">${escapeHtml(project.title)}</span>
+        </span>
       </button>
     `,
       )
@@ -675,17 +898,24 @@ async function loadProjects() {
       },
     });
 
-    initProjectListMenu(projects, viewport, scroller, openProjectDetail);
+    if (galleryResizeHandler) {
+      window.removeEventListener('resize', galleryResizeHandler);
+    }
+    galleryResizeHandler = () => setGalleryScrollPosition(viewport, track, scroller);
+    window.addEventListener('resize', galleryResizeHandler);
 
-    window.addEventListener('resize', () => setGalleryScrollPosition(viewport, track, scroller));
-
-    const hash = window.location.hash.match(/^#project\/(.+)$/);
-    if (hash) openProjectDetail(hash[1]);
+    if (!galleryHashHandled) {
+      galleryHashHandled = true;
+      const hash = window.location.hash.match(/^#project\/(.+)$/);
+      if (hash) openProjectDetail(hash[1]);
+    }
   } catch {
-    track.innerHTML = '<p class="projects-empty">Unable to load projects.</p>';
+    track.innerHTML = `<p class="projects-empty">${escapeHtml(t('loadError'))}</p>`;
   }
 }
 
+initLanguageSwitch();
+initSiteMenu();
 loadProjects();
 magnifier = initMagnifier();
 

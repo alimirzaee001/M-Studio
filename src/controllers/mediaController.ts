@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { createMediaSchema, normalizeClickableMedia, reorderSchema } from '../validation/schemas';
-import { processMediaFile, deleteUploadedFile } from '../services/mediaProcessor';
+import { processImageUpload, processMediaFile, deleteUploadedFile } from '../services/mediaProcessor';
 import { serializeMedia } from '../utils/serializers';
 import { getParamId } from '../utils/params';
 
@@ -31,6 +31,10 @@ export async function createMedia(
     const body = {
       media_type: req.body.media_type ?? 'image',
       media_url: req.body.media_url,
+      title: req.body.title,
+      body: req.body.body,
+      size: req.body.size !== undefined && req.body.size !== '' ? Number(req.body.size) : undefined,
+      color: req.body.color || undefined,
       is_clickable: req.body.is_clickable === 'true' || req.body.is_clickable === true,
       target_media_url: req.body.target_media_url,
       sort_order: req.body.sort_order !== undefined ? Number(req.body.sort_order) : undefined,
@@ -41,6 +45,11 @@ export async function createMedia(
 
     let mediaUrl = normalized.media_url ?? '';
     let targetMediaUrl = normalized.target_media_url ?? null;
+    let isClickable = normalized.is_clickable ?? false;
+    const title = normalized.title?.trim() || null;
+    const paragraphBody = normalized.body?.trim() || null;
+    const size = normalized.size ?? null;
+    const color = normalized.color ?? null;
 
     if (data.media_type === 'image') {
       const mediaFile = files?.media_file?.[0];
@@ -67,6 +76,26 @@ export async function createMedia(
           'target_media_file is required when is_clickable is true for image uploads',
         );
       }
+    } else if (data.media_type === 'black_rectangle') {
+      const mediaFile = files?.media_file?.[0];
+      if (!mediaFile) {
+        throw new AppError(400, 'media_file is required for black_rectangle');
+      }
+
+      mediaUrl = await processImageUpload(mediaFile.path, {
+        maxWidth: 3840,
+        quality: 90,
+      });
+      isClickable = true;
+      targetMediaUrl = null;
+    } else if (data.media_type === 'white_rectangle') {
+      mediaUrl = '';
+      isClickable = false;
+      targetMediaUrl = null;
+    } else if (data.media_type === 'paragraph') {
+      mediaUrl = '';
+      isClickable = false;
+      targetMediaUrl = null;
     }
 
     let sortOrder = normalized.sort_order;
@@ -83,7 +112,11 @@ export async function createMedia(
         sectionId,
         mediaType: normalized.media_type ?? 'image',
         mediaUrl,
-        isClickable: normalized.is_clickable ?? false,
+        title,
+        body: paragraphBody,
+        size,
+        color,
+        isClickable,
         targetMediaUrl,
         sortOrder,
       },

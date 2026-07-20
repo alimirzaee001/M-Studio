@@ -13,10 +13,12 @@ export function initMagnifier() {
   const lens = document.getElementById('magnifier-lens');
   const inner = document.getElementById('magnifier-lens-inner');
   const page = document.querySelector('.page');
+  const slot = toggle?.closest('.magnifier-slot') || toggle;
 
   if (!toggle || !root || !lens || !inner || !page) return null;
 
   let active = false;
+  let available = false;
   let mirror = null;
   let rafId = null;
   let refreshTimer = null;
@@ -104,6 +106,7 @@ export function initMagnifier() {
   }
 
   function enable() {
+    if (!available) return;
     active = true;
     root.hidden = false;
     root.setAttribute('aria-hidden', 'false');
@@ -116,6 +119,14 @@ export function initMagnifier() {
     document.addEventListener('scroll', syncScroll, true);
     window.addEventListener('resize', onResize);
   }
+
+  function setAvailable(nextAvailable) {
+    available = Boolean(nextAvailable);
+    if (slot) slot.hidden = !available;
+    if (!available) disable();
+  }
+
+  setAvailable(false);
 
   function disable() {
     active = false;
@@ -172,6 +183,8 @@ export function initMagnifier() {
       }
     },
     disable,
+    setAvailable,
     isActive: () => active,
+    isAvailable: () => available,
   };
 }

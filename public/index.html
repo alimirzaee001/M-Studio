@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -40,28 +40,54 @@
             aria-pressed="false"
           >
             <img
+              class="magnifier-btn-icon magnifier-btn-icon--zoom"
               src="/assets/magnifier-icon.svg"
               alt=""
-              class="magnifier-icon"
+              width="22"
+              height="22"
               draggable="false"
             />
-            <span class="magnifier-hint">جهت غیر فعال کردن کلید Esc روی کیبورد را فشار دهید</span>
+            <svg
+              class="magnifier-btn-icon magnifier-btn-icon--close"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              aria-hidden="true"
+            >
+              <line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5" />
+              <line x1="19" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="2.5" />
+            </svg>
           </button>
         </div>
         <button
           type="button"
           class="nav-box nav-box--menu"
           id="menu-toggle"
-          aria-label="Project list"
+          aria-label="Menu"
           aria-expanded="false"
-          aria-controls="project-dropdown"
+          aria-controls="site-menu"
         >
           <span class="menu-icon"><span></span><span></span><span></span></span>
         </button>
 
-        <div class="project-dropdown" id="project-dropdown" role="menu" aria-hidden="true" hidden>
-          <span class="project-dropdown-title">PROJECTS</span>
-          <ul class="project-list" id="project-list"></ul>
+        <div class="project-dropdown site-menu" id="site-menu" role="menu" aria-hidden="true" hidden>
+          <ul class="project-list site-menu-list" id="site-menu-list">
+            <li>
+              <button type="button" class="project-list-item site-menu-item" data-action="home" role="menuitem" data-i18n="home">
+                Home
+              </button>
+            </li>
+            <li>
+              <button type="button" class="project-list-item site-menu-item" data-action="about" role="menuitem" data-i18n="about">
+                About Us
+              </button>
+            </li>
+            <li>
+              <button type="button" class="project-list-item site-menu-item" data-action="contact" role="menuitem" data-i18n="contact">
+                Contact Us
+              </button>
+            </li>
+          </ul>
         </div>
       </nav>
     </header>
@@ -71,9 +97,9 @@
         <span class="m-group-char">M</span><span class="m-group-rest"> GROUP</span>
       </a>
       <div class="lang-switch">
-        <button type="button" class="lang-btn active" data-lang="en">EN</button>
+        <button type="button" class="lang-btn" data-lang="en">EN</button>
         <span class="lang-sep">/</span>
-        <button type="button" class="lang-btn" data-lang="fa">FA</button>
+        <button type="button" class="lang-btn active" data-lang="fa">FA</button>
       </div>
     </div>
 
@@ -99,20 +125,25 @@
   </div>
 
   <div class="lightbox" id="lightbox" hidden aria-hidden="true">
-    <div class="lightbox-stage">
-      <img class="lightbox-img" id="lightbox-img" alt="" draggable="false" />
-    </div>
+    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close">&times;</button>
+    <img class="lightbox-img" id="lightbox-img" alt="" draggable="false" />
   </div>
 
-  <button
-    type="button"
-    class="nav-box nav-box--close lightbox-close"
-    id="lightbox-close"
-    hidden
-    aria-label="Close image"
-  >
-    <span class="lightbox-close-icon" aria-hidden="true"></span>
-  </button>
+  <!-- CMS page modal: HTML from admin is trusted and injected via innerHTML -->
+  <div class="page-modal" id="page-modal" hidden aria-hidden="true">
+    <div class="page-modal-backdrop" id="page-modal-backdrop"></div>
+    <div
+      class="page-modal-dialog"
+      id="page-modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="page-modal-title"
+    >
+      <button type="button" class="page-modal-close" id="page-modal-close" aria-label="Close">&times;</button>
+      <h2 class="page-modal-title" id="page-modal-title"></h2>
+      <div class="page-modal-body" id="page-modal-body"></div>
+    </div>
+  </div>
 
   <div id="magnifier-root" class="magnifier-root" hidden aria-hidden="true">
     <div class="magnifier-lens" id="magnifier-lens">

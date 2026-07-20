@@ -6,6 +6,18 @@ async function main() {
   await prisma.media.deleteMany();
   await prisma.section.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.siteSettings.deleteMany();
+
+  await prisma.siteSettings.upsert({
+    where: { locale: 'fa' },
+    create: { id: 'fa', locale: 'fa', aboutHtml: '', contactHtml: '' },
+    update: {},
+  });
+  await prisma.siteSettings.upsert({
+    where: { locale: 'en' },
+    create: { id: 'en', locale: 'en', aboutHtml: '', contactHtml: '' },
+    update: {},
+  });
 
   const project = await prisma.project.create({
     data: {
@@ -13,6 +25,7 @@ async function main() {
       description:
         'خانه‌ای معاصر تک‌خانواده که برای هم‌زیستی با بستر طبیعی کنار رودخانه طراحی شده است؛ با فضاهای باز معیشتی و مصالح پایدار.',
       headerImageUrl: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&q=80',
+      locale: 'fa',
       sections: {
         create: [
           {

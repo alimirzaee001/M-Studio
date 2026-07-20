@@ -1,4 +1,4 @@
-import { Project, Section, Media } from '@prisma/client';
+import { Project, Section, Media, SiteSettings } from '@prisma/client';
 
 type SectionWithMedia = Section & { media: Media[] };
 type ProjectWithSections = Project & { sections: SectionWithMedia[] };
@@ -9,6 +9,10 @@ export function serializeMedia(media: Media) {
     section_id: media.sectionId,
     media_type: media.mediaType,
     media_url: media.mediaUrl,
+    title: media.title,
+    body: media.body,
+    size: media.size,
+    color: media.color,
     is_clickable: media.isClickable,
     target_media_url: media.isClickable ? media.targetMediaUrl : null,
     sort_order: media.sortOrder,
@@ -38,6 +42,7 @@ export function serializeProjectListItem(project: Project) {
     id: project.id,
     title: project.title,
     header_image_url: project.headerImageUrl,
+    locale: project.locale,
   };
 }
 
@@ -47,6 +52,7 @@ export function serializeProjectDetail(project: ProjectWithSections) {
     title: project.title,
     description: project.description,
     header_image_url: project.headerImageUrl,
+    locale: project.locale,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
     sections: project.sections
@@ -62,7 +68,17 @@ export function serializeProjectAdmin(project: Project) {
     title: project.title,
     description: project.description,
     header_image_url: project.headerImageUrl,
+    locale: project.locale,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
+  };
+}
+
+export function serializeSiteSettings(settings: SiteSettings) {
+  return {
+    locale: settings.locale,
+    about_html: settings.aboutHtml,
+    contact_html: settings.contactHtml,
+    updated_at: settings.updatedAt,
   };
 }

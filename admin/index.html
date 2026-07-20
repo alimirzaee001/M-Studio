@@ -19,9 +19,18 @@
       <div class="sidebar-header">
         <h1>M-Studio</h1>
         <p>Portfolio Admin</p>
+        <div class="admin-lang-switch" role="group" aria-label="Content language">
+          <button type="button" class="admin-lang-btn" data-locale="fa" id="admin-lang-fa">FA</button>
+          <span class="admin-lang-sep" aria-hidden="true">/</span>
+          <button type="button" class="admin-lang-btn" data-locale="en" id="admin-lang-en">EN</button>
+        </div>
+        <p class="admin-lang-hint" id="admin-lang-hint">Editing Persian content</p>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="btn-new-project">
         + New Project
+      </button>
+      <button type="button" class="btn btn-secondary btn-block sidebar-nav-btn" id="btn-pages">
+        Pages (About / Contact)
       </button>
       <nav class="project-list" id="project-list"></nav>
     </aside>

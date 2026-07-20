@@ -1,11 +1,26 @@
 import { api, resolveUrl, loadingEvents } from './api.js';
 
+const LOCALE_STORAGE_KEY = 'm-studio-admin-locale';
+
+function readStoredLocale() {
+  try {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored === 'fa' || stored === 'en') return stored;
+  } catch {
+    /* ignore */
+  }
+  return 'fa';
+}
+
 const state = {
   projects: [],
   currentProject: null,
   selectedId: null,
   isNew: false,
   headerFile: null,
+  viewingPages: false,
+  siteSettings: null,
+  locale: readStoredLocale(),
 };
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -98,8 +113,58 @@ function confirmDialog(title, message) {
 }
 
 async function loadProjects() {
-  state.projects = await api.listProjects();
+  state.projects = await api.listProjects(state.locale);
   renderSidebar();
+}
+
+function updateLocaleUI() {
+  $$('.admin-lang-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.locale === state.locale);
+  });
+  const hint = $('#admin-lang-hint');
+  if (hint) {
+    hint.textContent =
+      state.locale === 'fa' ? 'Editing Persian content' : 'Editing English content';
+  }
+}
+
+async function setAdminLocale(locale) {
+  if (locale !== 'fa' && locale !== 'en') return;
+  if (locale === state.locale) return;
+
+  state.locale = locale;
+  try {
+    localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    /* ignore */
+  }
+
+  state.selectedId = null;
+  state.isNew = false;
+  state.viewingPages = false;
+  state.currentProject = null;
+  state.headerFile = null;
+  state.siteSettings = null;
+
+  updateLocaleUI();
+
+  const main = $('#main-content');
+  main.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">◇</div>
+      <h2>Select a project</h2>
+      <p>Choose a project from the sidebar or create a new one for this language.</p>
+    </div>
+  `;
+
+  try {
+    await loadProjects();
+    if (state.projects.length > 0) {
+      await selectProject(state.projects[0].id);
+    }
+  } catch (err) {
+    toast(`Failed to load ${locale.toUpperCase()} projects: ${err.message}`, 'error');
+  }
 }
 
 function renderSidebar() {
@@ -107,7 +172,7 @@ function renderSidebar() {
   list.innerHTML = state.projects
     .map(
       (p) => `
-    <button type="button" class="project-item ${p.id === state.selectedId ? 'active' : ''}" data-id="${p.id}">
+    <button type="button" class="project-item ${!state.viewingPages && p.id === state.selectedId ? 'active' : ''}" data-id="${p.id}">
       ${escapeHtml(p.title)}
     </button>
   `,
@@ -117,6 +182,9 @@ function renderSidebar() {
   $$('.project-item', list).forEach((btn) => {
     btn.addEventListener('click', () => selectProject(btn.dataset.id));
   });
+
+  const pagesBtn = $('#btn-pages');
+  if (pagesBtn) pagesBtn.classList.toggle('active', state.viewingPages);
 
   const active = $('.project-item.active', list);
   if (active) {
@@ -133,6 +201,7 @@ function escapeHtml(str) {
 async function selectProject(id) {
   state.selectedId = id;
   state.isNew = false;
+  state.viewingPages = false;
   state.headerFile = null;
   renderSidebar();
 
@@ -152,19 +221,101 @@ async function selectProject(id) {
 function showNewProject() {
   state.selectedId = null;
   state.isNew = true;
+  state.viewingPages = false;
   state.currentProject = null;
   state.headerFile = null;
   renderSidebar();
   renderNewProjectForm();
 }
 
-function renderNewProjectForm() {
+async function showPagesEditor() {
+  state.selectedId = null;
+  state.isNew = false;
+  state.viewingPages = true;
+  state.currentProject = null;
+  state.headerFile = null;
+  renderSidebar();
+
   const main = $('#main-content');
+  main.classList.add('loading');
+
+  try {
+    state.siteSettings = await api.getSiteSettings(state.locale);
+    renderPagesEditor();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    main.classList.remove('loading');
+  }
+}
+
+function renderPagesEditor() {
+  const s = state.siteSettings || { about_html: '', contact_html: '' };
+  const main = $('#main-content');
+  const langLabel = state.locale === 'fa' ? 'Persian' : 'English';
+
   main.innerHTML = `
     <div class="page-header">
       <div>
-        <h2>New Project</h2>
-        <p>Create a new portfolio project</p>
+        <h2>Pages (${langLabel})</h2>
+        <p>Edit About Us and Contact Us for the ${langLabel} site only</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>About Us</h2></div>
+      <div class="form-group">
+        <label for="about-html">HTML content</label>
+        <textarea id="about-html" class="html-editor" placeholder="<p>About the studio…</p>">${escapeHtml(s.about_html || '')}</textarea>
+        <p class="form-hint">Rendered as HTML inside the public About modal (trusted admin content).</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Contact Us</h2></div>
+      <div class="form-group">
+        <label for="contact-html">HTML content</label>
+        <textarea id="contact-html" class="html-editor" placeholder="<p>Email, phone, address…</p>">${escapeHtml(s.contact_html || '')}</textarea>
+        <p class="form-hint">Rendered as HTML inside the public Contact modal (trusted admin content).</p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-primary" id="btn-save-pages">Save Pages</button>
+    </div>
+  `;
+
+  $('#btn-save-pages').addEventListener('click', savePages);
+}
+
+async function savePages() {
+  const btn = $('#btn-save-pages');
+  setButtonLoading(btn, true);
+  try {
+    state.siteSettings = await api.updateSiteSettings(
+      {
+        about_html: $('#about-html').value,
+        contact_html: $('#contact-html').value,
+        locale: state.locale,
+      },
+      state.locale,
+    );
+    toast('Pages saved');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+}
+
+function renderNewProjectForm() {
+  const main = $('#main-content');
+  const langLabel = state.locale === 'fa' ? 'Persian' : 'English';
+  main.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h2>New Project (${langLabel})</h2>
+        <p>Create a new portfolio project for the ${langLabel} site</p>
       </div>
     </div>
     <div class="card">
@@ -179,7 +330,13 @@ function renderNewProjectForm() {
   bindProjectFormEvents(true);
   $('#btn-cancel-new').addEventListener('click', () => {
     state.isNew = false;
-    $('#main-content').innerHTML = $('#empty-state').outerHTML;
+    $('#main-content').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">◇</div>
+        <h2>Select a project</h2>
+        <p>Choose a project from the sidebar or create a new one for this language.</p>
+      </div>
+    `;
   });
 }
 
@@ -251,17 +408,47 @@ function projectFormHtml(p) {
   `;
 }
 
+function mediaItemPreview(m) {
+  if (m.media_type === 'image') {
+    return `<img src="${resolveUrl(m.media_url)}" alt="" loading="lazy" />`;
+  }
+  if (m.media_type === 'video_link') {
+    return `<span>▶ Video Link</span>`;
+  }
+  if (m.media_type === 'black_rectangle') {
+    return `<span class="strip-preview strip-preview--black">${escapeHtml(m.title || 'Black strip')}</span>`;
+  }
+  if (m.media_type === 'white_rectangle') {
+    return `<span class="strip-preview strip-preview--white">${escapeHtml(m.title || 'White strip')}</span>`;
+  }
+  if (m.media_type === 'paragraph') {
+    const colorClass = m.color === 'white' ? 'strip-preview--white' : 'strip-preview--black';
+    const preview = (m.body || 'Paragraph').slice(0, 80);
+    return `<span class="strip-preview ${colorClass}">${escapeHtml(preview)}${(m.body || '').length > 80 ? '…' : ''}</span>`;
+  }
+  return `<span>${escapeHtml(m.media_type)}</span>`;
+}
+
+function mediaItemClass(m) {
+  if (m.media_type === 'video_link') return 'video-item';
+  if (m.media_type === 'black_rectangle') return 'strip-item strip-item--black';
+  if (m.media_type === 'white_rectangle') return 'strip-item strip-item--white';
+  if (m.media_type === 'paragraph') {
+    return m.color === 'white'
+      ? 'strip-item strip-item--white paragraph-item'
+      : 'strip-item strip-item--black paragraph-item';
+  }
+  return '';
+}
+
 function sectionHtml(section) {
   const mediaItems = section.media
     .map(
       (m) => `
-    <div class="media-item ${m.media_type === 'video_link' ? 'video-item' : ''}" data-id="${m.id}">
-      ${
-        m.media_type === 'image'
-          ? `<img src="${resolveUrl(m.media_url)}" alt="" loading="lazy" />`
-          : `<span>▶ Video Link</span>`
-      }
+    <div class="media-item ${mediaItemClass(m)}" data-id="${m.id}">
+      ${mediaItemPreview(m)}
       ${m.is_clickable ? '<span class="media-badge">Clickable</span>' : ''}
+      ${m.size != null ? `<span class="media-badge media-badge--size">${m.size}px</span>` : ''}
       <span class="drag-handle">⋮⋮</span>
       <div class="media-actions">
         <button type="button" class="btn btn-danger btn-icon btn-sm btn-delete-media" data-id="${m.id}" title="Delete">✕</button>
@@ -280,7 +467,7 @@ function sectionHtml(section) {
       </div>
       <div class="section-body">
         <div class="media-grid" data-section-id="${section.id}">
-          ${mediaItems || '<p class="form-hint" style="grid-column:1/-1">No media yet. Add images or videos below.</p>'}
+          ${mediaItems || '<p class="form-hint" style="grid-column:1/-1">No media yet. Add images, videos, rectangles, or paragraphs below.</p>'}
         </div>
         <button type="button" class="collapsible-toggle btn-add-media-toggle" data-section="${section.id}">
           + Add media to this section
@@ -292,6 +479,9 @@ function sectionHtml(section) {
             <select class="media-type-select" data-section="${section.id}">
               <option value="image">Image</option>
               <option value="video_link">Video Link</option>
+              <option value="black_rectangle">Black Rectangle</option>
+              <option value="white_rectangle">White Rectangle</option>
+              <option value="paragraph">Paragraph</option>
             </select>
           </div>
           <div class="media-image-fields" data-section="${section.id}">
@@ -315,6 +505,42 @@ function sectionHtml(section) {
             <div class="form-group">
               <label>Video URL</label>
               <input type="url" class="video-url-input" data-section="${section.id}" placeholder="https://youtube.com/..." />
+            </div>
+          </div>
+          <div class="media-rectangle-fields hidden" data-section="${section.id}">
+            <div class="form-group">
+              <label>Text</label>
+              <input type="text" class="rectangle-title-input" data-section="${section.id}" placeholder="e.g. نقشه طبقه اول" />
+            </div>
+            <div class="form-group">
+              <label>Size (width in px)</label>
+              <input type="number" class="rectangle-size-input" data-section="${section.id}" min="20" max="600" value="80" />
+              <p class="form-hint">Width of the vertical strip in the gallery</p>
+            </div>
+            <div class="rectangle-image-group" data-section="${section.id}">
+              <div class="form-group">
+                <label>Clickable Image</label>
+                <input type="file" class="rectangle-file-input" data-section="${section.id}" accept="image/*" />
+                <p class="form-hint">Opens in lightbox when the black strip is clicked</p>
+              </div>
+            </div>
+          </div>
+          <div class="media-paragraph-fields hidden" data-section="${section.id}">
+            <div class="form-group">
+              <label>متن پاراگراف</label>
+              <textarea class="paragraph-body-input" data-section="${section.id}" rows="5" placeholder="متن طولانی پاراگراف را اینجا بنویسید..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>Size (width in px)</label>
+              <input type="number" class="paragraph-size-input" data-section="${section.id}" min="20" max="600" value="280" />
+              <p class="form-hint">Width of the paragraph panel in the gallery</p>
+            </div>
+            <div class="form-group">
+              <label>رنگ پس‌زمینه</label>
+              <select class="paragraph-color-select" data-section="${section.id}">
+                <option value="white">سفید</option>
+                <option value="black">مشکی</option>
+              </select>
             </div>
           </div>
           <button type="button" class="btn btn-primary btn-sm btn-submit-media" data-section="${section.id}">Upload</button>
@@ -379,7 +605,11 @@ async function createProject() {
     }
 
     bar.indeterminate();
-    const project = await api.createProject({ ...data, header_image_url: headerUrl });
+    const project = await api.createProject({
+      ...data,
+      header_image_url: headerUrl,
+      locale: state.locale,
+    });
     toast('Project created');
     await loadProjects();
     selectProject(project.id);
@@ -503,9 +733,20 @@ function bindSectionEvents() {
   $$('.media-type-select').forEach((select) => {
     select.addEventListener('change', () => {
       const sid = select.dataset.section;
-      const isVideo = select.value === 'video_link';
-      $(`.media-image-fields[data-section="${sid}"]`).classList.toggle('hidden', isVideo);
+      const type = select.value;
+      const isVideo = type === 'video_link';
+      const isRectangle = type === 'black_rectangle' || type === 'white_rectangle';
+      const isParagraph = type === 'paragraph';
+      const isBlack = type === 'black_rectangle';
+
+      $(`.media-image-fields[data-section="${sid}"]`).classList.toggle(
+        'hidden',
+        isVideo || isRectangle || isParagraph,
+      );
       $(`.media-video-fields[data-section="${sid}"]`).classList.toggle('hidden', !isVideo);
+      $(`.media-rectangle-fields[data-section="${sid}"]`).classList.toggle('hidden', !isRectangle);
+      $(`.media-paragraph-fields[data-section="${sid}"]`).classList.toggle('hidden', !isParagraph);
+      $(`.rectangle-image-group[data-section="${sid}"]`).classList.toggle('hidden', !isBlack);
     });
   });
 
@@ -562,7 +803,7 @@ async function submitMedia(sectionId) {
       }
       fd.append('target_media_file', targetFile);
     }
-  } else {
+  } else if (mediaType === 'video_link') {
     const videoUrl = $(`.video-url-input[data-section="${sectionId}"]`).value.trim();
     if (!videoUrl) {
       toast('Please enter a video URL', 'error');
@@ -570,6 +811,49 @@ async function submitMedia(sectionId) {
     }
     fd.append('media_url', videoUrl);
     fd.append('is_clickable', 'false');
+  } else if (mediaType === 'paragraph') {
+    const body = $(`.paragraph-body-input[data-section="${sectionId}"]`).value.trim();
+    const size = Number($(`.paragraph-size-input[data-section="${sectionId}"]`).value);
+    const color = $(`.paragraph-color-select[data-section="${sectionId}"]`).value;
+
+    if (!body) {
+      toast('Please enter paragraph text', 'error');
+      return;
+    }
+    if (!Number.isFinite(size) || size < 20) {
+      toast('Size must be at least 20px', 'error');
+      return;
+    }
+
+    fd.append('body', body);
+    fd.append('size', String(size));
+    fd.append('color', color);
+    fd.append('is_clickable', 'false');
+  } else {
+    const title = $(`.rectangle-title-input[data-section="${sectionId}"]`).value.trim();
+    const size = Number($(`.rectangle-size-input[data-section="${sectionId}"]`).value);
+
+    if (!title) {
+      toast('Please enter text for the rectangle', 'error');
+      return;
+    }
+    if (!Number.isFinite(size) || size < 20) {
+      toast('Size must be at least 20px', 'error');
+      return;
+    }
+
+    fd.append('title', title);
+    fd.append('size', String(size));
+    fd.append('is_clickable', mediaType === 'black_rectangle' ? 'true' : 'false');
+
+    if (mediaType === 'black_rectangle') {
+      const mediaFile = $(`.rectangle-file-input[data-section="${sectionId}"]`).files[0];
+      if (!mediaFile) {
+        toast('Please select a clickable image', 'error');
+        return;
+      }
+      fd.append('media_file', mediaFile);
+    }
   }
 
   const btn = $(`.btn-submit-media[data-section="${sectionId}"]`);
@@ -647,7 +931,14 @@ function initMediaSortables() {
 }
 
 async function init() {
+  updateLocaleUI();
+
+  $$('.admin-lang-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setAdminLocale(btn.dataset.locale));
+  });
+
   $('#btn-new-project').addEventListener('click', showNewProject);
+  $('#btn-pages').addEventListener('click', showPagesEditor);
 
   try {
     await loadProjects();

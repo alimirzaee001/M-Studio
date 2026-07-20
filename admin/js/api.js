@@ -13,6 +13,12 @@ function emit(event, arg) {
   (listeners[event] || []).forEach((cb) => cb(arg));
 }
 
+function withLocale(url, locale) {
+  if (!locale) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}locale=${encodeURIComponent(locale)}`;
+}
+
 async function request(url, options = {}) {
   const headers =
     options.body instanceof FormData
@@ -84,7 +90,7 @@ function uploadRequest(url, method, formData) {
 }
 
 export const api = {
-  listProjects: () => request(`${API_PUBLIC}/projects`),
+  listProjects: (locale) => request(withLocale(`${API_PUBLIC}/projects`, locale)),
 
   getProject: (id) => request(`${API_PUBLIC}/projects/${id}`),
 
@@ -132,6 +138,15 @@ export const api = {
     request(`${API_ADMIN}/media/${mediaId}/reorder`, {
       method: 'PUT',
       body: JSON.stringify({ items }),
+    }),
+
+  getSiteSettings: (locale) =>
+    request(withLocale(`${API_ADMIN}/site-settings`, locale)),
+
+  updateSiteSettings: (body, locale) =>
+    request(withLocale(`${API_ADMIN}/site-settings`, locale), {
+      method: 'PUT',
+      body: JSON.stringify(body),
     }),
 };
 

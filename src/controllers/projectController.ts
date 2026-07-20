@@ -8,14 +8,17 @@ import {
   serializeProjectListItem,
 } from '../utils/serializers';
 import { getParamId } from '../utils/params';
+import { resolveLocale } from '../utils/locale';
 
 export async function listProjects(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
+    const locale = resolveLocale(req);
     const projects = await prisma.project.findMany({
+      where: { locale },
       orderBy: { createdAt: 'desc' },
     });
     res.json(projects.map(serializeProjectListItem));
@@ -62,12 +65,14 @@ export async function createProject(
 ): Promise<void> {
   try {
     const data = createProjectSchema.parse(req.body);
+    const locale = data.locale ?? resolveLocale(req, { fromBody: true });
 
     const project = await prisma.project.create({
       data: {
         title: data.title,
         description: data.description ?? null,
         headerImageUrl: data.header_image_url,
+        locale,
       },
     });
 
@@ -102,6 +107,7 @@ export async function updateProject(
         ...(data.header_image_url !== undefined && {
           headerImageUrl: data.header_image_url,
         }),
+        ...(data.locale !== undefined && { locale: data.locale }),
       },
     });
 

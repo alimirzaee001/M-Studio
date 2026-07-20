@@ -12,11 +12,14 @@ model Project {
   title          String
   description    String?
   headerImageUrl String   @map("header_image_url")
+  /// Content locale: "fa" | "en". Sections/media inherit via project.
+  locale         String   @default("fa")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   sections Section[]
 
+  @@index([locale])
   @@map("projects")
 }
 
@@ -39,6 +42,10 @@ model Media {
   sectionId       String   @map("section_id")
   mediaType       String   @default("image") @map("media_type")
   mediaUrl        String   @map("media_url")
+  title           String?
+  body            String?
+  size            Int?
+  color           String?
   isClickable     Boolean  @default(false) @map("is_clickable")
   targetMediaUrl  String?  @map("target_media_url")
   sortOrder       Int      @default(0) @map("sort_order")
@@ -48,4 +55,15 @@ model Media {
   section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
   @@map("section_media")
+}
+
+/// Per-locale site pages CMS (About / Contact). One row per locale (`fa` / `en`).
+model SiteSettings {
+  id          String   @id @default(uuid())
+  locale      String   @unique
+  aboutHtml   String   @default("") @map("about_html")
+  contactHtml String   @default("") @map("contact_html")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }

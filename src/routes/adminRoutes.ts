@@ -14,12 +14,19 @@ import {
 } from '../controllers/sectionController';
 import { createMedia, reorderMedia, deleteMedia } from '../controllers/mediaController';
 import { uploadImage } from '../controllers/uploadController';
+import {
+  getSiteSettings,
+  updateSiteSettings,
+} from '../controllers/siteSettingsController';
 
 const router = Router();
 
 router.use(requireAdmin);
 
 router.post('/upload', uploadSingle, uploadImage);
+
+router.get('/site-settings', getSiteSettings);
+router.put('/site-settings', updateSiteSettings);
 
 router.post('/projects', createProject);
 router.put('/projects/:id', updateProject);
