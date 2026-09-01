@@ -30,7 +30,7 @@ RUN apt-get update \
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
-  && npm install prisma@^6.19.3 --no-save \
+  && npm install prisma@^6.19.3 ts-node typescript --no-save \
   && rm -rf /root/.npm
 
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

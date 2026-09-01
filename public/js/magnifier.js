@@ -67,10 +67,6 @@ export function initMagnifier() {
       inner.appendChild(lightboxClone);
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7606/ingest/d480a2b4-f72d-4e9a-a787-d061d53c38ad',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ac2ea5'},body:JSON.stringify({sessionId:'ac2ea5',runId:'magnifier-lightbox',hypothesisId:'H1',location:'magnifier.js:buildMirror',message:'mirror built',data:{lightboxOpen,includesLightbox:lightboxOpen&&!!lightbox&&!lightbox.hidden,imgSrc:document.getElementById('lightbox-img')?.src||null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     syncScroll();
   }
 

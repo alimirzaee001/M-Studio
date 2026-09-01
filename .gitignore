@@ -6,3 +6,10 @@ uploads/
 *.db-journal
 .DS_Store
 .cursor/
+
+# Debug session logs
+debug-*.log
+
+# Docker image archives
+*.tar
+*.tar.gz
